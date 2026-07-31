@@ -285,6 +285,8 @@ class LocalDatabase {
       events: this.events.length,
       learningResources: this.learningResources.length,
       opportunities: this.opportunities.length,
+      blogPosts: 0,
+      forumThreads: 0,
       nextId: this.nextId
     };
   }
@@ -333,6 +335,36 @@ class LocalDatabase {
     this.initializeSampleData();
     const job = this.jobs.find(j => j.slug === slug);
     console.log(`🔍 Looking for job with slug "${slug}":`, job ? 'Found' : 'Not found');
+    return job;
+  }
+
+  updateHub(id: number, data: Partial<LocalEntity>): LocalEntity {
+    this.initializeSampleData();
+    const hub = this.hubs.find(h => h.id === id);
+    if (!hub) {
+      throw new Error(`Hub with id ${id} not found`);
+    }
+
+    Object.assign(hub, data, {
+      updatedAt: new Date(),
+      approvedAt: data.status === 'approved' ? new Date() : hub.approvedAt,
+    });
+
+    return hub;
+  }
+
+  updateJob(id: number, data: Partial<LocalEntity>): LocalEntity {
+    this.initializeSampleData();
+    const job = this.jobs.find(j => j.id === id);
+    if (!job) {
+      throw new Error(`Job with id ${id} not found`);
+    }
+
+    Object.assign(job, data, {
+      updatedAt: new Date(),
+      approvedAt: data.status === 'approved' ? new Date() : job.approvedAt,
+    });
+
     return job;
   }
 

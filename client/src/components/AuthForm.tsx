@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Github, Mail, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 export function AuthForm() {
   const [email, setEmail] = useState('');

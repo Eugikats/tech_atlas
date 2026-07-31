@@ -15,10 +15,7 @@ export default function AlgoliaChatbot() {
       searchClient={searchClient} 
       indexName="tech_atlas_new"
     >
-      <Chat 
-        agentId={AGENT_ID}
-        placeholder="Ask about tech hubs, startups..."
-      />
+      <Chat agentId={AGENT_ID} />
     </InstantSearch>
   );
 }

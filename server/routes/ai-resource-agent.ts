@@ -101,7 +101,7 @@ CRITICAL: Return ONLY the JSON object, no other text. Ensure the URL is valid an
 
     let resourceData;
     try {
-      const text = response.text.trim();
+      const text = response.text?.trim() || '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         resourceData = JSON.parse(jsonMatch[0]);

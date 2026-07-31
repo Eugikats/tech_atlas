@@ -196,7 +196,7 @@ export default function Ecosystem() {
     } catch (error) {
       console.error('Submission error:', error);
       toast.error('Failed to submit', {
-        description: error.message || 'Please try again later.',
+        description: error instanceof Error ? error.message : 'Please try again later.',
         duration: 4000
       });
     }
@@ -934,20 +934,20 @@ export default function Ecosystem() {
 
               <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
                 <p className="text-sm text-green-700 dark:text-green-300">
-                  <strong>Anonymous Submission:</strong> Your submission will appear immediately on the platform. Moderators will review and remove any inappropriate, duplicate, or irrelevant content.
+                  <strong>Submission Review:</strong> Your submission will be reviewed by moderators before it appears on the platform.
                 </p>
               </div>
 
               <div className="flex gap-3 pt-4">
                 <Button 
                   onClick={handleSubmissionSubmit}
-                  disabled={!submissionForm.name || !submissionForm.description || !submissionForm.location || !submissionForm.email || createHubMutation.isLoading || createCommunityMutation.isLoading || createStartupMutation.isLoading}
+                  disabled={!submissionForm.name || !submissionForm.description || !submissionForm.location || !submissionForm.email || createHubMutation.isPending || createCommunityMutation.isPending || createStartupMutation.isPending}
                   className="flex-1"
                 >
-                  {(createHubMutation.isLoading || createCommunityMutation.isLoading || createStartupMutation.isLoading) ? 'Submitting...' : (
+                  {(createHubMutation.isPending || createCommunityMutation.isPending || createStartupMutation.isPending) ? 'Submitting...' : (
                     <>
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Submit & Publish
+                      Submit for Review
                     </>
                   )}
                 </Button>

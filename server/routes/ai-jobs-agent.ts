@@ -104,7 +104,7 @@ CRITICAL: Return ONLY the JSON object, no other text. Ensure URLs are valid.`;
 
     let jobData;
     try {
-      const text = response.text.trim();
+      const text = response.text?.trim() || '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         jobData = JSON.parse(jsonMatch[0]);

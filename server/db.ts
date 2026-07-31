@@ -131,7 +131,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
       set: updateSet,
     });
   } catch (error) {
@@ -947,7 +948,7 @@ export async function deleteOpportunity(id: number) {
 export async function createBlogPost(data: InsertBlogPost) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(blogPosts).values(data);
+  const [result] = await db.insert(blogPosts).values(data).returning();
   return result;
 }
 
@@ -1038,7 +1039,7 @@ export async function getContentStats() {
   const db = await getDb();
   if (!db) return null;
   
-  const [hubsCount, communitiesCount, startupsCount, jobsCount, gigsCount, resourcesCount, eventsCount, opportunitiesCount, blogPostsCount] = await Promise.all([
+  const [hubsCount, communitiesCount, startupsCount, jobsCount, gigsCount, resourcesCount, eventsCount, opportunitiesCount, blogPostsCount, forumThreadsCount] = await Promise.all([
     db.select({ count: sql<number>`count(*)` }).from(hubs).where(eq(hubs.status, 'approved')),
     db.select({ count: sql<number>`count(*)` }).from(communities).where(eq(communities.status, 'approved')),
     db.select({ count: sql<number>`count(*)` }).from(startups).where(eq(startups.status, 'approved')),
@@ -1048,6 +1049,7 @@ export async function getContentStats() {
     db.select({ count: sql<number>`count(*)` }).from(events).where(eq(events.status, 'approved')),
     db.select({ count: sql<number>`count(*)` }).from(opportunities).where(eq(opportunities.status, 'approved')),
     db.select({ count: sql<number>`count(*)` }).from(blogPosts).where(eq(blogPosts.status, 'published')),
+    db.select({ count: sql<number>`count(*)` }).from(forumThreads),
   ]);
   
   return {
@@ -1060,6 +1062,7 @@ export async function getContentStats() {
     events: eventsCount[0]?.count || 0,
     opportunities: opportunitiesCount[0]?.count || 0,
     blogPosts: blogPostsCount[0]?.count || 0,
+    forumThreads: forumThreadsCount[0]?.count || 0,
   };
 }
 
@@ -1083,7 +1086,7 @@ export async function getRoleHierarchy() {
       FROM role_hierarchy
       ORDER BY level ASC
     `);
-    return result.rows;
+    return Array.from(result as unknown as any[]);
   } catch (error) {
     console.warn("Role hierarchy table not found, returning default roles:", error);
     // Return default role hierarchy if table doesn't exist
@@ -1103,33 +1106,25 @@ export async function getAllUsersWithRoles(filters?: { role?: string; isActive?:
   if (!db) return [];
 
   try {
-    let query = `
-      SELECT id, name, email, role, isActive, roleAssignedAt, assignedBy, createdAt
-      FROM users
-      WHERE 1=1
-    `;
-    
-    const params: any[] = [];
+    const conditions = [sql`1=1`];
     
     if (filters?.role) {
-      query += ` AND role = $${params.length + 1}`;
-      params.push(filters.role);
+      conditions.push(sql`role = ${filters.role}`);
     }
     
     if (filters?.isActive !== undefined) {
-      query += ` AND isActive = $${params.length + 1}`;
-      params.push(filters.isActive);
-    }
-    
-    query += ` ORDER BY createdAt DESC`;
-    
-    if (filters?.limit) {
-      query += ` LIMIT $${params.length + 1}`;
-      params.push(filters.limit);
+      conditions.push(sql`isActive = ${filters.isActive}`);
     }
 
-    const result = await db.execute(sql.raw(query, params));
-    return result.rows;
+    const limit = filters?.limit ? sql` LIMIT ${filters.limit}` : sql``;
+    const result = await db.execute(sql`
+      SELECT id, name, email, role, isActive, roleAssignedAt, assignedBy, createdAt
+      FROM users
+      WHERE ${sql.join(conditions, sql` AND `)}
+      ORDER BY createdAt DESC
+      ${limit}
+    `);
+    return Array.from(result as unknown as any[]);
   } catch (error) {
     console.warn("Error fetching users with roles:", error);
     // Fallback to basic user query
@@ -1231,28 +1226,21 @@ export async function getRoleAuditLog(filters?: { userId?: number; limit?: numbe
   if (!db) return [];
 
   try {
-    let query = `
-      SELECT id, userId, previousRole, newRole, assignedBy, reason, createdAt
-      FROM role_audit_log
-      WHERE 1=1
-    `;
-    
-    const params: any[] = [];
+    const conditions = [sql`1=1`];
     
     if (filters?.userId) {
-      query += ` AND userId = $${params.length + 1}`;
-      params.push(filters.userId);
-    }
-    
-    query += ` ORDER BY createdAt DESC`;
-    
-    if (filters?.limit) {
-      query += ` LIMIT $${params.length + 1}`;
-      params.push(filters.limit);
+      conditions.push(sql`userId = ${filters.userId}`);
     }
 
-    const result = await db.execute(sql.raw(query, params));
-    return result.rows;
+    const limit = filters?.limit ? sql` LIMIT ${filters.limit}` : sql``;
+    const result = await db.execute(sql`
+      SELECT id, userId, previousRole, newRole, assignedBy, reason, createdAt
+      FROM role_audit_log
+      WHERE ${sql.join(conditions, sql` AND `)}
+      ORDER BY createdAt DESC
+      ${limit}
+    `);
+    return Array.from(result as unknown as any[]);
   } catch (error) {
     console.warn("Role audit log table not found:", error);
     return [];
@@ -1264,33 +1252,25 @@ export async function getModerationLog(filters?: { moderatorId?: number; targetT
   if (!db) return [];
 
   try {
-    let query = `
-      SELECT id, moderatorId, action, targetType, targetId, reason, metadata, createdAt
-      FROM moderation_log
-      WHERE 1=1
-    `;
-    
-    const params: any[] = [];
+    const conditions = [sql`1=1`];
     
     if (filters?.moderatorId) {
-      query += ` AND moderatorId = $${params.length + 1}`;
-      params.push(filters.moderatorId);
+      conditions.push(sql`moderatorId = ${filters.moderatorId}`);
     }
     
     if (filters?.targetType) {
-      query += ` AND targetType = $${params.length + 1}`;
-      params.push(filters.targetType);
-    }
-    
-    query += ` ORDER BY createdAt DESC`;
-    
-    if (filters?.limit) {
-      query += ` LIMIT $${params.length + 1}`;
-      params.push(filters.limit);
+      conditions.push(sql`targetType = ${filters.targetType}`);
     }
 
-    const result = await db.execute(sql.raw(query, params));
-    return result.rows;
+    const limit = filters?.limit ? sql` LIMIT ${filters.limit}` : sql``;
+    const result = await db.execute(sql`
+      SELECT id, moderatorId, action, targetType, targetId, reason, metadata, createdAt
+      FROM moderation_log
+      WHERE ${sql.join(conditions, sql` AND `)}
+      ORDER BY createdAt DESC
+      ${limit}
+    `);
+    return Array.from(result as unknown as any[]);
   } catch (error) {
     console.warn("Moderation log table not found:", error);
     return [];

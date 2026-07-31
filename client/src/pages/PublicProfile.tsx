@@ -143,7 +143,7 @@ export default function PublicProfile() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
-                    {user.skills.map((skill) => (
+                    {user.skills.map((skill: string) => (
                       <Badge key={skill} variant="secondary" className="text-sm">
                         {skill}
                       </Badge>

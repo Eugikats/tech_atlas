@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Mail
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 type Period = '7d' | '30d' | '90d';
 
@@ -221,10 +222,10 @@ export function AnalyticsDashboard() {
                 </div>
                 <Button 
                   onClick={handleSendTestEmail}
-                  disabled={!emailTest || sendTestEmailMutation.isLoading}
+                  disabled={!emailTest || sendTestEmailMutation.isPending}
                   className="w-full"
                 >
-                  {sendTestEmailMutation.isLoading ? 'Sending...' : 'Send Welcome Email'}
+                  {sendTestEmailMutation.isPending ? 'Sending...' : 'Send Welcome Email'}
                 </Button>
                 {sendTestEmailMutation.isSuccess && (
                   <p className="text-sm text-green-600">Email sent successfully!</p>

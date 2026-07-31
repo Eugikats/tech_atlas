@@ -140,7 +140,7 @@ CRITICAL: Return ONLY the JSON object, no other text. Ensure deadline is in YYYY
 
     let itemData;
     try {
-      const text = response.text.trim();
+      const text = response.text?.trim() || '';
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         itemData = JSON.parse(jsonMatch[0]);

@@ -111,7 +111,7 @@ Return ONLY the JSON array, no other text.`;
 
     let aiResults = [];
     try {
-      const text = response.text.trim();
+      const text = response.text?.trim() || '';
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         aiResults = JSON.parse(jsonMatch[0]);

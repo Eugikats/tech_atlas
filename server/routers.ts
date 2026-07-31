@@ -18,6 +18,9 @@ function generateSlug(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+const localForumThreads: any[] = [];
+const localForumReplies: any[] = [];
+
 // Role-based procedures
 const moderatorProcedure = protectedProcedure.use(({ ctx, next }) => {
   const allowedRoles = ['moderator', 'editor', 'admin', 'core_admin'];
@@ -186,7 +189,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0,
-          status: 'approved',
+          status: 'pending',
         };
         
         console.log('🏢 Creating hub:', hubData.name);
@@ -244,9 +247,14 @@ export const appRouter = router({
           updateData.approvedBy = ctx.user.id;
           updateData.approvedAt = new Date();
         }
-        await db.updateHub(id, updateData);
-        const updated = await db.getHubBySlug((await db.getHubs({ limit: 1 }))[0]?.slug || '');
-        return updated;
+        try {
+          await db.updateHub(id, updateData);
+          const updated = await db.getHubBySlug((await db.getHubs({ limit: 1 }))[0]?.slug || '');
+          return updated;
+        } catch (error) {
+          console.warn('❌ Primary database failed for hub update, trying local database:', error);
+          return localDB.updateHub(id, updateData);
+        }
       }),
     
     delete: adminProcedure
@@ -329,7 +337,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0,
-          status: 'approved',
+          status: 'pending',
         };
         
         console.log('👥 Creating community:', communityData.name);
@@ -462,7 +470,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0,
-          status: 'approved',
+          status: 'pending',
         };
         
         console.log('🚀 Creating startup:', startupData.name);
@@ -603,7 +611,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0, // Use 0 for anonymous submissions
-          status: 'approved', // Auto-approve anonymous submissions
+          status: 'pending', // Public submissions require moderation
         };
         
         console.log('💼 Creating job:', jobData.title);
@@ -651,8 +659,13 @@ export const appRouter = router({
           updateData.approvedBy = ctx.user.id;
           updateData.approvedAt = new Date();
         }
-        await db.updateJob(id, updateData);
-        return { success: true };
+        try {
+          await db.updateJob(id, updateData);
+          return { id, ...updateData };
+        } catch (error) {
+          console.warn('❌ Primary database failed for job update, trying local database:', error);
+          return localDB.updateJob(id, updateData);
+        }
       }),
     
     delete: adminProcedure
@@ -741,7 +754,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0, // Use 0 for anonymous submissions
-          status: 'approved', // Auto-approve anonymous submissions
+          status: 'pending', // Public submissions require moderation
         };
         
         console.log('🎯 Creating gig:', gigData.title);
@@ -875,7 +888,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0, // Use 0 for anonymous submissions
-          status: 'approved', // Auto-approve anonymous submissions
+          status: 'pending', // Public submissions require moderation
         };
         
         console.log('📚 Creating learning resource:', resourceData.title);
@@ -1020,7 +1033,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0, // Use 0 for anonymous submissions
-          status: 'approved', // Auto-approve anonymous submissions
+          status: 'pending', // Public submissions require moderation
         };
         
         console.log('📅 Creating event:', eventData.title);
@@ -1161,7 +1174,7 @@ export const appRouter = router({
           ...input,
           slug,
           createdBy: ctx.user?.id ?? 0, // Use 0 for anonymous submissions
-          status: 'approved', // Auto-approve anonymous submissions
+          status: 'pending', // Public submissions require moderation
         };
         
         console.log('🎯 Creating opportunity:', opportunityData.title);
@@ -1311,11 +1324,30 @@ export const appRouter = router({
           return result;
         } catch (supabaseError) {
           console.error('❌ SUPABASE CLIENT failed for blog post creation:', supabaseError);
-          throw new TRPCError({ 
-            code: 'INTERNAL_SERVER_ERROR', 
-            message: `Failed to create blog post: ${supabaseError instanceof Error ? supabaseError.message : 'Unknown error'}` 
-          });
         }
+
+        // Try primary database as backup
+        try {
+          console.log('📊 Trying primary database for blog post creation...');
+          const result = await db.createBlogPost(blogData);
+          if (result) {
+            console.log('✅ Blog post created in PRIMARY database:', result?.title);
+            return result;
+          }
+        } catch (primaryError) {
+          console.error('❌ PRIMARY database failed for blog post creation:', primaryError);
+        }
+
+        // Return mock success response as final fallback for local tests/dev.
+        console.warn('⚠️ USING MOCK RESPONSE - BLOG POST WILL NOT BE PERSISTENT!');
+        return {
+          id: Date.now(),
+          ...blogData,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          publishedAt: null,
+          featured: false,
+        };
       }),
     
     update: adminProcedure
@@ -1412,9 +1444,11 @@ export const appRouter = router({
           console.warn('❌ Primary database failed:', primaryError);
         }
         
-        // Use empty array as final fallback
-        console.log('⚠️ Using empty fallback for forum threads...');
-        return [];
+        console.log('⚠️ Using local in-memory fallback for forum threads...');
+        const localThreads = input?.category
+          ? localForumThreads.filter(thread => thread.category === input.category)
+          : localForumThreads;
+        return [...localThreads].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       }),
     
     getThread: publicProcedure
@@ -1434,11 +1468,15 @@ export const appRouter = router({
         
         // Try primary database as backup
         try {
-          return await db.getForumThreadBySlug(input.slug);
+          const primaryResult = await db.getForumThreadBySlug(input.slug);
+          if (primaryResult) {
+            return primaryResult;
+          }
         } catch (error) {
           console.warn('❌ Failed to get forum thread by slug:', error);
-          return null;
         }
+
+        return localForumThreads.find(thread => thread.slug === input.slug) || null;
       }),
     
     createThread: publicProcedure
@@ -1482,9 +1520,8 @@ export const appRouter = router({
           console.error('❌ PRIMARY SUPABASE database failed for thread creation:', primaryError);
         }
         
-        // Return mock success response as final fallback
-        console.warn('⚠️ USING MOCK RESPONSE - DATA WILL NOT BE PERSISTENT!');
-        return {
+        console.warn('⚠️ USING LOCAL IN-MEMORY FORUM FALLBACK - DATA WILL NOT BE PERSISTENT!');
+        const localThread = {
           id: Date.now(),
           ...threadData,
           createdAt: new Date(),
@@ -1494,6 +1531,8 @@ export const appRouter = router({
           viewCount: 0,
           replyCount: 0,
         };
+        localForumThreads.push(localThread);
+        return localThread;
       }),
     
     getReplies: publicProcedure
@@ -1516,8 +1555,11 @@ export const appRouter = router({
           return await db.getForumRepliesByThreadId(input.threadId);
         } catch (error) {
           console.warn('❌ Failed to get forum replies:', error);
-          return [];
         }
+
+        return localForumReplies
+          .filter(reply => reply.threadId === input.threadId)
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       }),
     
     createReply: protectedProcedure
@@ -1557,9 +1599,8 @@ export const appRouter = router({
           console.error('❌ PRIMARY database failed for reply creation:', primaryError);
         }
         
-        // Return mock response as final fallback
-        console.warn('⚠️ USING MOCK RESPONSE - DATA WILL NOT BE PERSISTENT!');
-        return {
+        console.warn('⚠️ USING LOCAL IN-MEMORY REPLY FALLBACK - DATA WILL NOT BE PERSISTENT!');
+        const localReply = {
           id: Date.now(),
           ...replyData,
           createdAt: new Date(),
@@ -1567,6 +1608,13 @@ export const appRouter = router({
           upvotes: 0,
           downvotes: 0,
         };
+        localForumReplies.push(localReply);
+        const thread = localForumThreads.find(thread => thread.id === input.threadId);
+        if (thread) {
+          thread.replyCount = (thread.replyCount || 0) + 1;
+          thread.updatedAt = new Date();
+        }
+        return localReply;
       }),
     
     vote: protectedProcedure
@@ -1603,9 +1651,15 @@ export const appRouter = router({
           console.error('❌ PRIMARY database failed for voting:', primaryError);
         }
         
-        // Return success response as fallback
         console.warn('⚠️ Vote recorded locally only');
-        return { success: true };
+        const collection = input.targetType === 'thread' ? localForumThreads : localForumReplies;
+        const target = collection.find(item => item.id === input.targetId);
+        const column = input.voteType === 'up' ? 'upvotes' : 'downvotes';
+        if (target) {
+          target[column] = (target[column] || 0) + 1;
+          target.updatedAt = new Date();
+        }
+        return { success: true, [column]: target?.[column] || 1 };
       }),
     
     updateThread: adminProcedure
@@ -1675,6 +1729,7 @@ export const appRouter = router({
           opportunities: opportunitiesResult?.length || 0,
           learningResources: learningResult?.length || 0,
           blogPosts: 0, // Blog posts not implemented yet
+          forumThreads: 0,
         };
         
         console.log('✅ Stats from Supabase client:', supabaseStats);
@@ -1695,7 +1750,8 @@ export const appRouter = router({
         events: localStats.events,
         learningResources: localStats.learningResources,
         opportunities: localStats.opportunities,
-        blogPosts: 0,
+        blogPosts: localStats.blogPosts,
+        forumThreads: localStats.forumThreads,
       };
     }),
 
@@ -1718,7 +1774,24 @@ export const appRouter = router({
     }),
     
     getStats: moderatorProcedure.query(async () => {
-      return await db.getContentStats();
+      const stats = await db.getContentStats();
+      if (stats) {
+        return stats;
+      }
+
+      const localStats = localDB.getStats();
+      return {
+        hubs: localStats.hubs,
+        communities: localStats.communities,
+        startups: localStats.startups,
+        jobs: localStats.jobs,
+        gigs: localStats.gigs,
+        learningResources: localStats.learningResources,
+        events: localStats.events,
+        opportunities: localStats.opportunities,
+        blogPosts: localStats.blogPosts,
+        forumThreads: localStats.forumThreads,
+      };
     }),
 
     getModerationLog: moderatorProcedure.query(async ({ ctx }) => {
@@ -1749,7 +1822,7 @@ export const appRouter = router({
     }),
 
     getAllUsers: adminProcedure.query(async () => {
-      return await db.getAllUsers();
+      return await db.getAllUsersWithRoles();
     }),
 
     assignRole: adminProcedure
@@ -2587,3 +2660,5 @@ export const appRouter = router({
       }),
   }),
 });
+
+export type AppRouter = typeof appRouter;

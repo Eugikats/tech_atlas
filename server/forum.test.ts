@@ -14,11 +14,14 @@ function createAuthContext(): { ctx: TrpcContext } {
     role: "user",
     bio: null,
     skills: null,
+    categories: null,
     location: null,
     website: null,
     github: null,
     twitter: null,
     linkedin: null,
+    isPublic: false,
+    avatar: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -41,7 +44,7 @@ describe("forum", () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
-    const result = await caller.forum.list({ category: undefined });
+    const result = await caller.forum.listThreads({ category: undefined });
 
     expect(Array.isArray(result)).toBe(true);
   });
@@ -50,11 +53,10 @@ describe("forum", () => {
     const { ctx } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
 
-    const thread = await caller.forum.create({
+    const thread = await caller.forum.createThread({
       title: "Test Thread",
       content: "This is a test thread",
       category: "general",
-      isAnonymous: false,
     });
 
     expect(thread).toHaveProperty("id");
@@ -67,15 +69,14 @@ describe("forum", () => {
     const caller = appRouter.createCaller(ctx);
 
     // Create a thread first
-    const thread = await caller.forum.create({
+    const thread = await caller.forum.createThread({
       title: "Thread for Detail Test",
-      content: "Content",
+      content: "Content for detail test",
       category: "general",
-      isAnonymous: false,
     });
 
     // Get the thread details
-    const result = await caller.forum.getById({ id: thread.id });
+    const result = await caller.forum.getThread({ slug: thread.slug });
 
     expect(result).toHaveProperty("id");
     expect(result.id).toBe(thread.id);
@@ -87,18 +88,16 @@ describe("forum", () => {
     const caller = appRouter.createCaller(ctx);
 
     // Create a thread first
-    const thread = await caller.forum.create({
+    const thread = await caller.forum.createThread({
       title: "Thread for Reply Test",
-      content: "Content",
+      content: "Content for reply test",
       category: "general",
-      isAnonymous: false,
     });
 
     // Add a reply
-    const reply = await caller.forum.addReply({
+    const reply = await caller.forum.createReply({
       threadId: thread.id,
       content: "This is a test reply",
-      isAnonymous: false,
     });
 
     expect(reply).toHaveProperty("id");
@@ -111,17 +110,17 @@ describe("forum", () => {
     const caller = appRouter.createCaller(ctx);
 
     // Create a thread first
-    const thread = await caller.forum.create({
+    const thread = await caller.forum.createThread({
       title: "Thread for Upvote Test",
-      content: "Content",
+      content: "Content for upvote test",
       category: "general",
-      isAnonymous: false,
     });
 
     // Upvote the thread
     const result = await caller.forum.vote({
-      threadId: thread.id,
-      value: 1,
+      targetType: "thread",
+      targetId: thread.id,
+      voteType: "up",
     });
 
     expect(result.success).toBe(true);

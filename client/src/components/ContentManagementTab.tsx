@@ -323,9 +323,9 @@ export function ContentManagementTab() {
         <TabsList className="grid grid-cols-5 mb-4">
           <TabsTrigger value="blogs">
             Blogs ({blogs?.length || 0})
-            {blogs?.filter((b: any) => b.status === 'pending').length > 0 && (
+            {(blogs?.filter((b: any) => b.status === 'pending').length || 0) > 0 && (
               <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 text-xs flex items-center justify-center">
-                {blogs.filter((b: any) => b.status === 'pending').length}
+                {blogs?.filter((b: any) => b.status === 'pending').length || 0}
               </Badge>
             )}
           </TabsTrigger>

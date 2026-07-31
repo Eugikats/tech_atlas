@@ -1,8 +1,16 @@
 import { Resend } from 'resend';
 import { ENV } from './env';
 
-// Initialize Resend
-const resend = new Resend(ENV.resendApiKey);
+let resendClient: Resend | null = null;
+
+function getResendClient() {
+  if (!ENV.resendApiKey) {
+    return null;
+  }
+
+  resendClient ??= new Resend(ENV.resendApiKey);
+  return resendClient;
+}
 
 export interface EmailTemplate {
   to: string | string[];
@@ -15,18 +23,25 @@ export interface EmailTemplate {
 export const emailService = {
   // Send a generic email
   send: async (template: EmailTemplate) => {
-    if (!ENV.resendApiKey) {
+    const resend = getResendClient();
+
+    if (!resend) {
       console.warn('Resend API key not configured. Email will not be sent.');
       return { success: false, error: 'Email service not configured' };
     }
 
     try {
-      const result = await resend.emails.send({
+      const emailPayload = {
         from: template.from || 'Tech Atlas Uganda <noreply@techatlas.ug>',
         to: template.to,
         subject: template.subject,
-        html: template.html,
-        text: template.text,
+        ...(template.html ? { html: template.html } : {}),
+        ...(template.text ? { text: template.text } : {}),
+      };
+
+      const result = await resend.emails.send({
+        text: template.text || '',
+        ...emailPayload,
       });
 
       return { success: true, data: result };

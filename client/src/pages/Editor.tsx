@@ -106,7 +106,7 @@ export default function Editor() {
                         <div className="flex items-center gap-3">
                           <BookOpen className="h-8 w-8 text-purple-500" />
                           <div>
-                            <p className="text-2xl font-bold">{stats?.learning || 0}</p>
+                            <p className="text-2xl font-bold">{stats?.learningResources || 0}</p>
                             <p className="text-sm text-muted-foreground">Resources</p>
                           </div>
                         </div>
@@ -116,7 +116,7 @@ export default function Editor() {
                         <div className="flex items-center gap-3">
                           <FileText className="h-8 w-8 text-orange-500" />
                           <div>
-                            <p className="text-2xl font-bold">{stats?.blog || 0}</p>
+                            <p className="text-2xl font-bold">{stats?.blogPosts || 0}</p>
                             <p className="text-sm text-muted-foreground">Blog Posts</p>
                           </div>
                         </div>

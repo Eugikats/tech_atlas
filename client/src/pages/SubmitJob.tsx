@@ -23,7 +23,7 @@ const CURRENCIES = ["UGX", "USD", "EUR", "GBP"];
 
 export default function SubmitJob() {
   const [, setLocation] = useLocation();
-  const { user, authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [formData, setFormData] = useState({
     title: "",
     company: "",

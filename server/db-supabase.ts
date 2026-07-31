@@ -1,17 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY!;
+export const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+export const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseServiceKey);
 
 console.log('[Supabase] Initializing server client...');
 console.log('[Supabase] URL:', supabaseUrl ? 'Set' : 'Missing');
 console.log('[Supabase] Using:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Service Role Key' : 'Anon Key');
 
-if (!supabaseUrl) {
-  throw new Error('SUPABASE_URL or VITE_SUPABASE_URL must be set');
+if (!isSupabaseConfigured) {
+  console.warn('[Supabase] Missing URL or key. Database-backed routes require Supabase environment variables.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey);
+export const supabase = createClient(
+  supabaseUrl || 'http://127.0.0.1:54321',
+  supabaseServiceKey || 'supabase-not-configured'
+);
 
 // Fallback database operations using Supabase client
 export async function createHubSupabase(data: any) {
@@ -707,7 +711,8 @@ export async function voteOnForumContentSupabase(data: any) {
     }
     
     // Increment the vote count
-    const newValue = (thread[column] || 0) + 1;
+    const currentVotes = thread as Record<'upvotes' | 'downvotes', number | null>;
+    const newValue = (currentVotes[column] || 0) + 1;
     
     const { error: updateError } = await supabase
       .from('forum_threads')
@@ -737,7 +742,8 @@ export async function voteOnForumContentSupabase(data: any) {
     }
     
     // Increment the vote count
-    const newValue = (reply[column] || 0) + 1;
+    const currentVotes = reply as Record<'upvotes' | 'downvotes', number | null>;
+    const newValue = (currentVotes[column] || 0) + 1;
     
     const { error: updateError } = await supabase
       .from('forum_replies')

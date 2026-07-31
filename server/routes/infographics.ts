@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
-import { getDb } from '../db.js';
-import { sql } from 'drizzle-orm';
+import { getAllUsers, getContentStats } from '../db.js';
 
 const router = Router();
 
@@ -19,33 +18,24 @@ const getGeminiClient = () => {
 // Fetch real-time stats from database
 async function getDatabaseStats() {
   try {
-    const db = await getDb();
-    if (!db) {
+    const stats = await getContentStats();
+    if (!stats) {
       console.error('Database not available');
       return null;
     }
 
-    // Query all records and count them (same as dashboard)
-    const [hubs] = await db.execute(sql`SELECT * FROM tech_hubs WHERE status = 'approved'`);
-    const [communities] = await db.execute(sql`SELECT * FROM communities WHERE status = 'approved'`);
-    const [startups] = await db.execute(sql`SELECT * FROM startups WHERE status = 'approved'`);
-    const [jobs] = await db.execute(sql`SELECT * FROM opportunities WHERE type = 'job' AND status = 'approved'`);
-    const [gigs] = await db.execute(sql`SELECT * FROM opportunities WHERE type = 'gig' AND status = 'approved'`);
-    const [events] = await db.execute(sql`SELECT * FROM events WHERE status = 'approved'`);
-    const [blogPosts] = await db.execute(sql`SELECT * FROM blog_posts WHERE status = 'published'`);
-    const [users] = await db.execute(sql`SELECT * FROM users`);
-    const [forumPosts] = await db.execute(sql`SELECT * FROM forum_posts`);
+    const users = await getAllUsers();
 
     return {
-      hubs: hubs.rows?.length || 0,
-      communities: communities.rows?.length || 0,
-      startups: startups.rows?.length || 0,
-      jobs: jobs.rows?.length || 0,
-      gigs: gigs.rows?.length || 0,
-      events: events.rows?.length || 0,
-      blog_posts: blogPosts.rows?.length || 0,
-      total_users: users.rows?.length || 0,
-      forum_posts: forumPosts.rows?.length || 0,
+      hubs: stats.hubs,
+      communities: stats.communities,
+      startups: stats.startups,
+      jobs: stats.jobs,
+      gigs: stats.gigs,
+      events: stats.events,
+      blog_posts: stats.blogPosts,
+      total_users: users.length,
+      forum_posts: stats.forumThreads,
     };
   } catch (error) {
     console.error('Error fetching database stats:', error);

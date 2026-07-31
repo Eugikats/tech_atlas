@@ -121,7 +121,7 @@ export default function CoreAdminGod() {
   const totalEcosystem = (hubs?.length || 0) + (communities?.length || 0) + (startups?.length || 0);
   const totalPending = (pendingContent?.events?.length || 0) + 
                        (pendingContent?.jobs?.length || 0) +
-                       (pendingContent?.blogs?.length || 0);
+                       (pendingContent?.blogPosts?.length || 0);
 
   return (
     <ProtectedRoute requireRole="core_admin">

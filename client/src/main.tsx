@@ -11,6 +11,23 @@ import "./index.css";
 
 const queryClient = new QueryClient();
 
+const installUmamiAnalytics = () => {
+  const src = import.meta.env.VITE_UMAMI_SRC;
+  const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID;
+
+  if (!src || !websiteId || typeof document === "undefined") {
+    return;
+  }
+
+  const script = document.createElement("script");
+  script.defer = true;
+  script.src = src;
+  script.dataset.websiteId = websiteId;
+  document.head.appendChild(script);
+};
+
+installUmamiAnalytics();
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;

@@ -1,5 +1,5 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
+import type { User } from "../../drizzle/schema-simple";
 import { sdk } from "./sdk";
 import { supabase } from "../db-supabase";
 import * as db from "../db";
